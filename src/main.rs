@@ -1,15 +1,14 @@
-use std::fmt;
-use std::fmt::Debug;
-
 use color_eyre::eyre::{Ok, Result};
 use ratatui::{
 	DefaultTerminal, Frame,
 	crossterm::event::{self, Event},
-	layout::{Constraint, Layout},
+	layout::{Constraint, Layout, Spacing},
 	style::{Color, Stylize},
+	symbols::merge::MergeStrategy,
 	text::ToSpan,
-	widgets::Block,
+	widgets::{Block, BorderType},
 };
+use std::fmt;
 
 #[derive(Debug, Default)]
 enum Mode {
@@ -61,18 +60,17 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 fn render(frame: &mut Frame, app_state: &mut AppState) {
 	let layout = Layout::default()
 		.direction(ratatui::layout::Direction::Vertical)
-		.constraints(vec![
-			Constraint::from_mins([3, 3]),
-			Constraint::from_maxes([65535, 3]),
-		])
+		.constraints(vec![Constraint::Fill(1), Constraint::Max(3)])
+		.spacing(Spacing::Overlap(1))
 		.split(frame.area());
 
 	// Text area
 	frame.render_widget(
 		Block::bordered()
-			.border_type(ratatui::widgets::BorderType::Rounded)
+			.border_type(BorderType::Rounded)
 			.fg(Color::LightGreen)
-			.title(" Zedditor ".to_span().into_centered_line()),
+			.title(" Zedditor ".to_span().into_centered_line())
+			.merge_borders(MergeStrategy::Fuzzy),
 		layout[0],
 	);
 
@@ -81,9 +79,10 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 	frame.render_widget(
 		// Command area
 		Block::bordered()
-			.border_type(ratatui::widgets::BorderType::Rounded)
+			.border_type(BorderType::Rounded)
 			.fg(Color::LightGreen)
-			.title(mode),
+			.title(mode)
+			.merge_borders(MergeStrategy::Fuzzy),
 		layout[1],
 	);
 }
