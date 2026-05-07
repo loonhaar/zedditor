@@ -74,10 +74,10 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 		layout[0],
 	);
 
+	// Command area
 	let mut mode = app_state.mode.to_string();
 	mode = format!(" {mode} ");
 	frame.render_widget(
-		// Command area
 		Block::bordered()
 			.border_type(BorderType::Rounded)
 			.fg(Color::LightGreen)
