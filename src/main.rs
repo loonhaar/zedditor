@@ -26,7 +26,7 @@ impl fmt::Display for Mode {
 struct AppState {
 	mode: Mode,
 	input: String,
-	// TODO: buffer,
+	buffer: String,
 }
 
 fn main() -> Result<()> {
@@ -52,7 +52,7 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 						break;
 					}
 				}
-				Mode::Edit => handle_edit(key.code),
+				Mode::Edit => handle_edit(key.code, app_state),
 			}
 		}
 	}
@@ -66,20 +66,33 @@ fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
 	}
 
 	match code {
-		event::KeyCode::Char(c) => {
-			app_state.input.push(c);
-		}
+		KeyCode::Char(c) => app_state.input.push(c),
 		KeyCode::Backspace => {
 			app_state.input.pop();
 		}
-		event::KeyCode::Enter => {
+		KeyCode::Enter => {
 			if app_state.input == "q" {
 				return true;
 			}
-			app_state.input.clear();
-			app_state.input.push('?');
+
+			match &*app_state.input {
+				"q" => {
+					return true;
+				}
+				"a" => {
+					app_state.mode = Mode::Edit;
+				}
+				_ => {
+					app_state.input.clear();
+					app_state.input.push('?');
+				}
+			}
+
+			if !(app_state.input == "?") {
+				app_state.input.clear();
+			}
 		}
-		event::KeyCode::Esc => {
+		KeyCode::Esc => {
 			return true;
 		}
 		_ => {}
@@ -88,7 +101,21 @@ fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
 	false
 }
 
-fn handle_edit(code: KeyCode) {}
+fn handle_edit(code: KeyCode, app_state: &mut AppState) {
+	match code {
+		KeyCode::Esc => {
+			app_state.mode = Mode::Command;
+		}
+		KeyCode::Char(c) => app_state.buffer.push(c),
+		KeyCode::Backspace => {
+			app_state.buffer.pop();
+		}
+		KeyCode::Enter => {
+			app_state.buffer.push('\n');
+		}
+		_ => {}
+	}
+}
 
 // TODO: function that checks if there are unsaved changes when user tries to leave
 
@@ -109,6 +136,10 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 		.title_alignment(HorizontalAlignment::Center)
 		.merge_borders(MergeStrategy::Fuzzy);
 
+	let inner_editor_area = editor_pane.inner(layout[0]);
+
+	let editor_widget = Paragraph::new(app_state.buffer.as_str());
+
 	let command_pane = Block::bordered()
 		.border_type(BorderType::Rounded)
 		.fg(Color::LightGreen)
@@ -120,10 +151,41 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 	let input_widget = Paragraph::new(app_state.input.as_str());
 
 	frame.render_widget(editor_pane, layout[0]);
+	frame.render_widget(editor_widget, inner_editor_area);
+
 	frame.render_widget(command_pane, layout[1]);
 	frame.render_widget(input_widget, inner_command_area);
-	frame.set_cursor_position((
-		inner_command_area.x + app_state.input.len() as u16,
-		inner_command_area.y,
-	));
+
+	match app_state.mode {
+		Mode::Command => frame.set_cursor_position((
+			inner_command_area.x + app_state.input.len() as u16,
+			inner_command_area.y,
+		)),
+		Mode::Edit => frame.set_cursor_position(calculate_cursor_position(
+			app_state,
+			inner_editor_area.x,
+			inner_editor_area.y,
+		)),
+	}
+}
+
+fn calculate_cursor_position(app_state: &mut AppState, x: u16, y: u16) -> (u16, u16) {
+	let number_of_cr: u16 = app_state
+		.buffer
+		.chars()
+		.filter(|c| *c == '\n')
+		.count()
+		.try_into()
+		.unwrap();
+
+	let mut last_line_len: u16 = 0;
+
+	for c in app_state.buffer.chars().rev() {
+		if c == '\n' {
+			break;
+		}
+		last_line_len += 1;
+	}
+
+	(last_line_len + x, number_of_cr + y)
 }
