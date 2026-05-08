@@ -1,4 +1,4 @@
-use color_eyre::eyre::{Ok, Result};
+use color_eyre::eyre;
 use ratatui::{
 	DefaultTerminal, Frame,
 	crossterm::event::{self, Event, KeyCode},
@@ -7,7 +7,7 @@ use ratatui::{
 	symbols::merge::MergeStrategy,
 	widgets::{Block, BorderType, Paragraph},
 };
-use std::fmt;
+use std::{fmt, fs, path::Path};
 
 #[derive(Debug, Default)]
 enum Mode {
@@ -29,7 +29,7 @@ struct AppState {
 	buffer: String,
 }
 
-fn main() -> Result<()> {
+fn main() -> eyre::Result<()> {
 	let mut app_state = AppState::default();
 
 	color_eyre::install()?;
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
 	result
 }
 
-fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
+fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> eyre::Result<()> {
 	loop {
 		terminal.draw(|t| render(t, app_state))?;
 
@@ -56,7 +56,7 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 			}
 		}
 	}
-	Ok(())
+	eyre::Ok(())
 }
 
 fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
@@ -73,6 +73,21 @@ fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
 		KeyCode::Enter => {
 			if app_state.input == "q" {
 				return true;
+			}
+
+			if let Some(filename) = app_state.input.strip_prefix("w ") {
+				let trimmed = filename.trim();
+				match save_file(trimmed, &app_state.buffer) {
+					Ok(_) => {
+						app_state.input.clear();
+						return false; // Success
+					}
+					Err(_) => {
+						app_state.input.clear();
+						app_state.input.push('?');
+						return false; // Error state
+					}
+				}
 			}
 
 			match &*app_state.input {
@@ -114,6 +129,26 @@ fn handle_edit(code: KeyCode, app_state: &mut AppState) {
 			app_state.buffer.push('\n');
 		}
 		_ => {}
+	}
+}
+
+fn save_file(filename: &str, buffer: &str) -> Result<(), String> {
+	let path = Path::new(filename);
+
+	if path.components().count() != 1 {
+		return Err("Invalid filename: paths not allowed".to_string());
+	}
+
+	match fs::File::options().write(true).create_new(true).open(path) {
+		std::result::Result::Ok(mut file) => {
+			use std::io::Write;
+			if let Err(e) = file.write_all(buffer.as_bytes()) {
+				Err(format!("Write failed: {}", e))
+			} else {
+				std::result::Result::Ok(())
+			}
+		}
+		Err(e) => Err(format!("File error: {}", e)),
 	}
 }
 
