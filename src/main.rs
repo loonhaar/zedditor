@@ -1,11 +1,11 @@
 use color_eyre::eyre::{Ok, Result};
 use ratatui::{
 	DefaultTerminal, Frame,
-	crossterm::event::{self, Event},
+	crossterm::event::{self, Event, KeyCode},
 	layout::{Constraint, HorizontalAlignment, Layout, Spacing},
 	style::{Color, Stylize},
 	symbols::merge::MergeStrategy,
-	widgets::{Block, BorderType},
+	widgets::{Block, BorderType, Paragraph},
 };
 use std::fmt;
 
@@ -13,7 +13,7 @@ use std::fmt;
 enum Mode {
 	#[default]
 	Command,
-	//Edit, // TODO: make the borders and titles yellow in edit mode
+	Edit, // TODO: make the borders and titles yellow in edit mode
 }
 
 impl fmt::Display for Mode {
@@ -25,6 +25,7 @@ impl fmt::Display for Mode {
 #[derive(Debug, Default)]
 struct AppState {
 	mode: Mode,
+	input: String,
 	// TODO: buffer,
 }
 
@@ -45,16 +46,51 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 		terminal.draw(|t| render(t, app_state))?;
 
 		if let Event::Key(key) = event::read()? {
-			match key.code {
-				event::KeyCode::Esc => {
-					break;
+			match app_state.mode {
+				Mode::Command => {
+					if handle_command(key.code, app_state) {
+						break;
+					}
 				}
-				_ => {}
+				Mode::Edit => handle_edit(key.code),
 			}
 		}
 	}
 	Ok(())
 }
+
+fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
+	// Removes the `?` if the last command was unsuccssful
+	if app_state.input == "?" {
+		app_state.input.clear();
+	}
+
+	match code {
+		event::KeyCode::Char(c) => {
+			app_state.input.push(c);
+		}
+		KeyCode::Backspace => {
+			app_state.input.pop();
+		}
+		event::KeyCode::Enter => {
+			if app_state.input == "q" {
+				return true;
+			}
+			app_state.input.clear();
+			app_state.input.push('?');
+		}
+		event::KeyCode::Esc => {
+			return true;
+		}
+		_ => {}
+	}
+
+	false
+}
+
+fn handle_edit(code: KeyCode) {}
+
+// TODO: function that checks if there are unsaved changes when user tries to leave
 
 fn render(frame: &mut Frame, app_state: &mut AppState) {
 	let constraints = [Constraint::Min(3), Constraint::Length(3)];
@@ -79,6 +115,15 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 		.title(mode)
 		.merge_borders(MergeStrategy::Fuzzy);
 
+	let inner_command_area = command_pane.inner(layout[1]);
+
+	let input_widget = Paragraph::new(app_state.input.as_str());
+
 	frame.render_widget(editor_pane, layout[0]);
 	frame.render_widget(command_pane, layout[1]);
+	frame.render_widget(input_widget, inner_command_area);
+	frame.set_cursor_position((
+		inner_command_area.x + app_state.input.len() as u16,
+		inner_command_area.y,
+	));
 }
