@@ -76,8 +76,13 @@ fn handle_command(code: KeyCode, app_state: &mut AppState) -> bool {
 			}
 
 			if let Some(filename) = app_state.input.strip_prefix("w ") {
-				let trimmed = filename.trim();
-				match save_file(trimmed, &app_state.buffer) {
+				let safe_fileneme: String = filename
+					.trim()
+					.chars()
+					.filter(|&c| c.is_alphanumeric() || "_-. ".contains(c))
+					.take(255)
+					.collect();
+				match save_file(&safe_fileneme, &app_state.buffer) {
 					Ok(_) => {
 						app_state.input.clear();
 						return false; // Success
@@ -152,8 +157,6 @@ fn save_file(filename: &str, buffer: &str) -> Result<(), String> {
 	}
 }
 
-// TODO: function that checks if there are unsaved changes when user tries to leave
-
 fn render(frame: &mut Frame, app_state: &mut AppState) {
 	let constraints = [Constraint::Min(3), Constraint::Length(3)];
 
@@ -164,9 +167,14 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 	let mut mode = app_state.mode.to_string();
 	mode = format!(" {mode} ");
 
+	let border_color = match app_state.mode {
+		Mode::Command => Color::LightGreen,
+		Mode::Edit => Color::Yellow,
+	};
+
 	let editor_pane = Block::bordered()
 		.border_type(BorderType::Rounded)
-		.fg(Color::LightGreen)
+		.fg(border_color)
 		.title(" Zedditor ")
 		.title_alignment(HorizontalAlignment::Center)
 		.merge_borders(MergeStrategy::Fuzzy);
@@ -177,7 +185,7 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 
 	let command_pane = Block::bordered()
 		.border_type(BorderType::Rounded)
-		.fg(Color::LightGreen)
+		.fg(border_color)
 		.title(mode)
 		.merge_borders(MergeStrategy::Fuzzy);
 
