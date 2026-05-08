@@ -2,10 +2,9 @@ use color_eyre::eyre::{Ok, Result};
 use ratatui::{
 	DefaultTerminal, Frame,
 	crossterm::event::{self, Event},
-	layout::{Constraint, Layout, Spacing},
+	layout::{Constraint, HorizontalAlignment, Layout, Spacing},
 	style::{Color, Stylize},
 	symbols::merge::MergeStrategy,
-	text::ToSpan,
 	widgets::{Block, BorderType},
 };
 use std::fmt;
@@ -58,31 +57,28 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 }
 
 fn render(frame: &mut Frame, app_state: &mut AppState) {
-	let layout = Layout::default()
-		.direction(ratatui::layout::Direction::Vertical)
-		.constraints(vec![Constraint::Fill(1), Constraint::Max(3)])
+	let constraints = [Constraint::Min(3), Constraint::Length(3)];
+
+	let layout = Layout::vertical(constraints)
 		.spacing(Spacing::Overlap(1))
 		.split(frame.area());
 
-	// Text area
-	frame.render_widget(
-		Block::bordered()
-			.border_type(BorderType::Rounded)
-			.fg(Color::LightGreen)
-			.title(" Zedditor ".to_span().into_centered_line())
-			.merge_borders(MergeStrategy::Fuzzy),
-		layout[0],
-	);
-
-	// Command area
 	let mut mode = app_state.mode.to_string();
 	mode = format!(" {mode} ");
-	frame.render_widget(
-		Block::bordered()
-			.border_type(BorderType::Rounded)
-			.fg(Color::LightGreen)
-			.title(mode)
-			.merge_borders(MergeStrategy::Fuzzy),
-		layout[1],
-	);
+
+	let editor_pane = Block::bordered()
+		.border_type(BorderType::Rounded)
+		.fg(Color::LightGreen)
+		.title(" Zedditor ")
+		.title_alignment(HorizontalAlignment::Center)
+		.merge_borders(MergeStrategy::Fuzzy);
+
+	let command_pane = Block::bordered()
+		.border_type(BorderType::Rounded)
+		.fg(Color::LightGreen)
+		.title(mode)
+		.merge_borders(MergeStrategy::Fuzzy);
+
+	frame.render_widget(editor_pane, layout[0]);
+	frame.render_widget(command_pane, layout[1]);
 }
